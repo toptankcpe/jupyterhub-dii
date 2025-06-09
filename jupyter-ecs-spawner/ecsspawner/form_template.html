@@ -1,0 +1,176 @@
+<!-- Load Choices.js CSS for enhanced select input styling -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+
+<!-- Custom CSS overrides for dark theme support using data-bs-theme -->
+<style>
+    /* Dark mode adjustments for Choices.js elements */
+    [data-bs-theme="dark"] .choices,
+    [data-bs-theme="dark"] .choices__inner,
+    [data-bs-theme="dark"] .choices__list--dropdown,
+    [data-bs-theme="dark"] .choices__list--single {
+        background-color: #23272f !important;
+        color: #fff !important;
+        border-color: #444 !important;
+    }
+    [data-bs-theme="dark"] .choices__list--dropdown .choices__item--selectable,
+    [data-bs-theme="dark"] .choices__list--dropdown .choices__item--disabled {
+        background-color: #23272f !important;
+        color: #fff !important;
+    }
+    [data-bs-theme="dark"] .choices__item--selectable.is-highlighted,
+    [data-bs-theme="dark"] .choices__item--selectable.is-selected {
+        background-color: #313641 !important;
+        color: #fff !important;
+    }
+</style>
+
+<!-- Load Choices.js script for search-enabled select elements -->
+<script src="https://cdn.jsdelivr.net/npm/choices.js@10.2.0/public/assets/scripts/choices.min.js"></script>
+
+<script>
+    // These variables are templated from server-side Python
+    instance_details = $instance_json;
+    regions = $regions;
+
+    // Map to hold available EC2 instances for selected region
+    available_instances = {};
+    tbl_header = ["Type", "vCPU", "Memory", "Arch", "GPU"];
+
+    var $$ = jQuery;
+
+    $$(document).ready(function () {
+        // --- REGION SELECT INITIALIZATION ---
+        var region_select = document.getElementById('region');
+        for (var i = 0; i < regions.length; i++) {
+            var opt = document.createElement('option');
+            opt.value = regions[i];
+            opt.innerHTML = regions[i];
+            region_select.appendChild(opt);
+        }
+
+        // Set default region and apply Choices.js behavior
+        region_select.value = "ap-southeast-7";
+        window.regionChoices = new Choices('#region', { searchEnabled: true, allowHTML: true });
+
+        // --- INSTANCE SELECT UPDATE WHEN REGION CHANGES ---
+        function updateAvailableInstances() {
+            region = document.getElementById("region").value;
+            available_instances = instance_details[region];
+
+            // Populate instance select based on selected region
+            var select = document.getElementById('instance');
+            select.innerHTML = '';
+            var keys = Object.keys(available_instances).sort();
+            for (var i = 0; i < keys.length; i++) {
+                var opt = document.createElement('option');
+                opt.value = keys[i];
+                opt.innerHTML = keys[i];
+                select.appendChild(opt);
+            }
+
+            // Reinitialize Choices.js for new instance list
+            if (window.instanceChoices) window.instanceChoices.destroy();
+            select.value = "t3.large";
+            window.instanceChoices = new Choices('#instance', { searchEnabled: true, allowHTML: true });
+        }
+
+        // --- DISPLAY INSTANCE DETAILS IN TABLE FORMAT ---
+        function displayInstanceDetails() {
+            var instance_type = document.getElementById("instance").value;
+            var tbl = document.createElement('table');
+            var head = tbl.createTHead();
+            var row = tbl.insertRow();
+
+            // Header row
+            for (var i = 0; i < tbl_header.length; i++) {
+                var th = document.createElement("th");
+                var text = document.createTextNode(tbl_header[i]);
+                th.appendChild(text);
+                row.appendChild(th);
+            }
+
+            // Row for selected instance type
+            var instance = available_instances[instance_type];
+            row = tbl.insertRow();
+            for (var i = 0; i < tbl_header.length; i++) {
+                var cell = row.insertCell();
+                var text;
+                if (tbl_header[i] == "Type") {
+                    text = document.createTextNode(instance_type);
+                } else if (tbl_header[i] == "GPU") {
+                    if (instance.gpu !== undefined) {
+                        text = document.createTextNode(instance.gpu.count + " x " + instance.gpu.type);
+                    } else {
+                        text = document.createTextNode("No GPU");
+                    }
+                } else {
+                    text = document.createTextNode(instance[tbl_header[i].toLowerCase()]);
+                }
+                cell.appendChild(text);
+            }
+
+            tbl.setAttribute("class", "table");
+            var details = document.getElementById("details");
+            details.innerHTML = '';
+            details.appendChild(tbl);
+        }
+
+        // Attach change event handlers
+        $$('#region').on('change', updateAvailableInstances);
+        $$('#instance').on('change', displayInstanceDetails);
+
+        // Initial load
+        updateAvailableInstances();
+        displayInstanceDetails();
+    });
+</script>
+
+<!-- FORM LAYOUT -->
+<div class="form-group">
+    <!-- Region Selector -->
+    <label for="region">Region</label>
+    <select id="region" name="region" class="form-select"></select>
+
+    <!-- Instance Type Selector -->
+    <br />
+    <label for="instance">Instance type</label>
+    <select class="form-select" name="instance" id="instance"></select>
+
+    <!-- Spot Instance Toggle -->
+    <br />
+    <label for="spot">Spot instance</label>
+    <input type="checkbox" id="spot" name="spot">
+
+    <!-- Accordion for Advanced Configuration -->
+    <div class="wrapper center-block">
+        <div class="accordion" id="accordionAdvanced">
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="headingAdvanced">
+                    <button class="accordion-button collapsed" type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#advancedConfig"
+                            aria-expanded="false"
+                            aria-controls="advancedConfig">
+                        Advanced Configuration
+                    </button>
+                </h2>
+                <div id="advancedConfig" class="accordion-collapse collapse"
+                    aria-labelledby="headingAdvanced"
+                    data-bs-parent="#accordionAdvanced">
+                    <div class="accordion-body">
+                        <!-- Docker Image Input -->
+                        <label for="image">Docker Image</label>
+                        <input type="text" id="image" name="image" class="form-control mb-2">
+
+                        <!-- Root Volume Input -->
+                        <label for="volume">Root Volume Size (GiB)</label>
+                        <input type="number" id="volume" name="volume" class="form-control">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Container for EC2 instance detail table -->
+<div id="details"></div>
