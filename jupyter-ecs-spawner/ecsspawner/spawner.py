@@ -336,10 +336,17 @@ class ECSSpawner(Spawner):
         self.log.info('Using docker image {0}'.format(container_image))
         self.log.info('Creating ECS task')
         self.state.append('Creating ECS task')
+
+        # taskRole by user
+        if self.user.name in ['pantawat.pr', 'chayasin.sa', 'bhudith.as', 'kasidit.ma', 'titirat.bo']:
+            task_role_to_use = self.task_role_arn
+        else:
+            task_role_to_use = 'arn:aws:iam::096020056038:role/DataAnalystRole'
+
         r = ecs_client.register_task_definition(
             family='jupyter-task-{0}'.format(re.sub(r'[^a-zA-Z0-9_-]', '_', self.user.name)),
             networkMode='host',
-            taskRoleArn=self.task_role_arn,
+            taskRoleArn=task_role_to_use,
             executionRoleArn=self.execution_role_arn,
             containerDefinitions=[
                 {
